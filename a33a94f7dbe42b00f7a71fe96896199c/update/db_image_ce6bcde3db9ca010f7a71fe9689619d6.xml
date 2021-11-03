@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="db_image">
+    <db_image action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <category>general</category>
+        <format>png</format>
+        <height>22</height>
+        <image>902c8d27db9ca010f7a71fe9689619aa</image>
+        <name>disconnected.png</name>
+        <size_bytes>471</size_bytes>
+        <sys_class_name>db_image</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2020-11-11 16:04:45</sys_created_on>
+        <sys_id>ce6bcde3db9ca010f7a71fe9689619d6</sys_id>
+        <sys_mod_count>4</sys_mod_count>
+        <sys_name>disconnected.png</sys_name>
+        <sys_package display_value="CTI-Connector-ServiceNow" source="x_sofin_cti_connec">a33a94f7dbe42b00f7a71fe96896199c</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="CTI-Connector-ServiceNow">a33a94f7dbe42b00f7a71fe96896199c</sys_scope>
+        <sys_update_name>db_image_ce6bcde3db9ca010f7a71fe9689619d6</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2020-11-11 16:07:49</sys_updated_on>
+        <thumbnail/>
+        <width>22</width>
+    </db_image>
+    <sys_attachment action="INSERT_OR_UPDATE">
+        <average_image_color>#ff3714</average_image_color>
+        <chunk_size_bytes>700000</chunk_size_bytes>
+        <compressed>true</compressed>
+        <content_type>image/png</content_type>
+        <encryption_context/>
+        <file_name>image</file_name>
+        <hash>c620b241a44cad07b278a1c0cc779f12428f3ed399111af9e8e32ebbd8a703bb</hash>
+        <image_height>22</image_height>
+        <image_width>22</image_width>
+        <size_bytes>471</size_bytes>
+        <size_compressed>494</size_compressed>
+        <state>available</state>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2020-11-11 16:07:49</sys_created_on>
+        <sys_id>902c8d27db9ca010f7a71fe9689619aa</sys_id>
+        <sys_mod_count>5</sys_mod_count>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2020-11-11 16:07:49</sys_updated_on>
+        <table_name>ZZ_YYdb_image</table_name>
+        <table_sys_id>ce6bcde3db9ca010f7a71fe9689619d6</table_sys_id>
+    </sys_attachment>
+    <sys_attachment_doc action="INSERT_OR_UPDATE">
+        <data>H4sIAAAAAAAAAA==</data>
+        <length>16</length>
+        <position>0</position>
+        <sys_attachment display_value="image" sys_id="902c8d27db9ca010f7a71fe9689619aa">902c8d27db9ca010f7a71fe9689619aa</sys_attachment>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2020-11-11 16:07:49</sys_created_on>
+        <sys_id>d02c8d27db9ca010f7a71fe9689619aa</sys_id>
+    </sys_attachment_doc>
+    <sys_attachment_doc action="INSERT_OR_UPDATE">
+        <data>AdcBKP6JUE5HDQoaCgAAAA1JSERSAAAAFgAAABYIBgAAAMS0bDsAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAGJSURBVDiNrdXPSgJBHAfw384ummzWFgkdgsAuCoaCnYIOdvQJepoOPk1P0DEPXROUBL0kBEGBUlO2mDa7E99ld1lMXf/M9yA4Mh/GmdnvalJKiks9b5aIyPK/8krHbsbNmQu3TneuXKLrFNMyls4Otpjmjf+4krjjDkau7DOiWvHx62YpuJ43rbTOGkcJI3uYMBau6m0i6GUiekPHLVc6Np8LNwrpCyK6LZrJbUPT4v6tFyEltezxNxFVy+3h/T+4V7KOP4TTXgWdxvcMvZBt8meMseDHd+HcrYMimIO5MIIxD8ZBYU/XQaM4DFghjNOPO6hlAgNWCONKbaz6CSyGy497qgqGBRMrtoLLryK+ZTFl4lQAczymquJb3HtAusXdfi6VULLP3dFkkGt9ZrytQKGoWnFgMf+jhkLZNDBgUbQrHgrpp5KZXPvpQ1807XHvrD08oWhX7Bv6JYpELFH8s1DMRX0GYyHst1J1VTxam9FO3rjoX3+dDhfO+cKij0b5q2lWVn6ZEtEf/8TidRr8yqoAAAAASUVORK5CYIJ4en/S1wEAAA==</data>
+        <length>648</length>
+        <position>1</position>
+        <sys_attachment display_value="image" sys_id="902c8d27db9ca010f7a71fe9689619aa">902c8d27db9ca010f7a71fe9689619aa</sys_attachment>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2020-11-11 16:07:49</sys_created_on>
+        <sys_id>542c8d27db9ca010f7a71fe9689619aa</sys_id>
+    </sys_attachment_doc>
+</record_update>

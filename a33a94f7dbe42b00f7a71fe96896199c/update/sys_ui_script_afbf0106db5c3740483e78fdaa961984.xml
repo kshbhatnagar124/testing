@@ -1,0 +1,873 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ui_script">
+    <sys_ui_script action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <description/>
+        <global>false</global>
+        <name>x_sofin_cti_connec.iwsutilPEF</name>
+        <script><![CDATA[///========================================
+/// SoftPhone s.r.l
+/// Scenarios/Workflows implementation
+/// Date: 23/09/2021
+///========================================
+
+function EY_AddSecondsToUniversalTime(seconds, dateString)
+{
+	log.infoFormat("EY_AddSecondsToUniversalTime  dateString [{0}] seconds to [{1}] add", dateString, seconds);
+	let newDate;
+	if(dateString)
+		newDate = new Date(dateString);
+	else
+		newDate = new Date("1970-01-01 00:00:00");
+	
+	newDate.setSeconds( newDate.getSeconds() + seconds );
+
+	//format date
+	let snDuration = "{0}-{1}-{2} {3}:{4}:{5}".format(newDate.getFullYear(), 
+		String(newDate.getMonth() + 1).padStart(2, 0),
+		String(newDate.getDate()).padStart(2, 0),
+		String(newDate.getHours()).padStart(2, 0),
+		String(newDate.getMinutes()).padStart(2, 0),
+		String(newDate.getSeconds()).padStart(2, 0));
+	
+	log.infoFormat("EY_AddSecondsToUniversalTime  [{0}]", snDuration);
+	return snDuration;
+}
+
+function EY_GetSecondsFromStringDate(dateString)
+{
+	return new Date(dateString).getTime() / 1000;
+}
+
+function EY_UpdateAssignedTo(entityName, id)
+{
+	try{
+		var gr = new GlideRecord(entityName);
+		gr.get(id);
+		if(gr.currentRow != -1)
+		{
+			gr.assigned_to = g_user.userID;
+			gr.update();
+		}else
+		{
+			log.warnFormat("EY_UpdateAssignedTo {0}={1} not found", entityName, id );
+		}
+	}catch(e)
+	{
+		log.error("EY_UpdateAssignedTo " + e.message);
+	}
+}
+
+function VoiceDefaultPopUp(message, isInbound) {
+	var idActivity = null;
+	var description;
+	var idContactSelected = IdentifyContact(message);
+
+	if (isInbound){
+description = "Call Inbound from {0}".format(message.ANI, message.InteractionID);
+
+        //group = message.SourceMsg.eventBody.participants[2].name;
+	
+//        description +=         group;
+	
+        }
+		
+		else{
+		description = "Call Outbound to {0}".format(message.DNIS, message.InteractionID);
+		}
+		
+
+	if (iwscore.snConfig.screenpopnew) {
+		idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "phone", description, message);
+		SetDataAndScreenPop(message, idContactSelected, idActivity);
+	} else {
+		if (idContactSelected) {
+			var refEnt = CountOpenEntitiesByContact(idContactSelected);
+			switch (refEnt.count) {
+				case 0:
+					//create incident
+					idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "phone", description, message);
+					break;
+				case 1:
+					idActivity = refEnt.entityId;
+					break;
+				default:
+					switch (iwscore.snConfig.defaultEntity) {
+						case "incident":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateIN 1,2^caller_id=' + idContactSelected
+							});
+							break;
+						case "sn_customerservice_case":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateIN 1,2^contact=' + idContactSelected
+							});
+							break;
+						case "interaction":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateINnew,work_in_progress^opened_for=' + idContactSelected
+							});
+							break;
+					}
+			}
+			if (idActivity) {
+				log.debugFormat("[VoiceDefaultPopUp] screenpop on Entity {0}", idActivity);
+				SetDataAndScreenPop(message, idContactSelected, idActivity);
+			} else {
+				//multiple Activities
+				log.debug("Contact found, ScreenPop on activity list");
+			}
+		} else {
+			log.debug("No Contact found, create Activity and ScreenPop");
+			idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "phone", description, message);
+			SetDataAndScreenPop(message, idContactSelected, idActivity);
+		}
+	}
+}
+
+function IdentifyContact(message) {
+	var idContactSelected = null;
+	if ((message.attachdata) && (message.attachdata.CONTACT_ID))
+		idContactSelected = message.attachdata.CONTACT_ID;
+	else {
+		if (message.CallType && (message.CallType.toLowerCase() == "outbound"))
+			idContactSelected = SearchContactByPhone(message.DNIS);
+		else
+			idContactSelected = SearchContactByPhone(message.ANI);
+	}
+	return idContactSelected;
+}
+
+/**
+ * 
+ * @param {*} interactionId 
+ * @param {*} contactId 
+ * @param {*} contact_type 
+ * @param {*} description 
+ */
+function CreateDefaultEntity(interactionId, contactId, contact_type, description, message) {
+	var idActivity;
+	switch (iwscore.snConfig.defaultEntity) {
+		case "incident":
+			idActivity = CreateIncident(interactionId, contactId, contact_type, description);
+			break;
+		case "sn_customerservice_case":
+			idActivity = CreateCase(interactionId, contactId, contact_type, description, 1);
+			break;
+		case "interaction":
+			idActivity = CreateInteraction(interactionId, contactId, contact_type, description, message);
+			break;
+
+	}
+	return idActivity;
+}
+
+function SetDataAndScreenPop(message, idContactSelected, idActivity) {
+	log.debugFormat("[SetDataAndScreenPop] ContactSelected:{0} Activity{1}", idContactSelected, idActivity);
+	var myAttachdata = {};
+	if (idContactSelected)
+		myAttachdata.CONTACT_ID = idContactSelected;
+
+	myAttachdata.ACTIVITY_ID = idActivity;
+	myAttachdata.ENTITY_TABLE = iwscore.snConfig.defaultEntity;
+	try {
+		iwscommand.SetAttachdataByIdAndCustomerId(message.InteractionID, message.CustomerID, myAttachdata);
+	} catch (e) {
+		log.error("Error in SetAttachData" + e.message);
+	}
+
+	log.debugFormat("[SetDataAndScreenPop] screenpop on Entity {0}", idActivity);
+	OpenRecord(iwscore.snConfig.defaultEntity, idActivity);
+}
+
+/**
+ * Chat Scenario/Workflow implementation
+ */
+
+function ChatContactPopUpEmailAddress(message) {
+	log.info("ChatContactPopUpEmailAddress");
+	var idActivity = null;
+	var idContactSelected = SearchContactByField('email', message.attachdata.EmailAddress);
+	var description = "Chat {0}  : Subject: {1}".format(message.InteractionID, message.attachdata.Subject);
+	if (iwscore.snConfig.screenpopnew) {
+		idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "chat", description, message);
+		SetDataAndScreenPop(message, idContactSelected, idActivity);
+	} else {
+		if (idContactSelected) {
+			var refEnt = CountOpenEntitiesByContact(idContactSelected);
+			switch (refEnt.count) {
+				case 0:
+					//create incident
+					idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "chat", description, message);
+					break;
+				case 1:
+					idActivity = refEnt.entityId;
+					break;
+				default:
+					switch (iwscore.snConfig.defaultEntity) {
+						case "incident":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateIN 1,2^caller_id=' + idContactSelected
+							});
+							break;
+						case "sn_customerservice_case":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateIN 1,2^contact=' + idContactSelected
+							});
+							break;
+						case "interaction":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateINnew,work_in_progress^opened_for=' + idContactSelected
+							});
+							break;
+					}
+			}
+			if (idActivity) {
+				log.debugFormat("[ChatContactPopUpEmailAddress] screenpop on Entity {0}", idActivity);
+				SetDataAndScreenPop(message, idContactSelected, idActivity);
+			} else {
+				//multiple Activities
+				log.debug("Contact found, ScreenPop on activity list");
+			}
+		} else {
+			log.debug("No Contact found, create Activity and ScreenPop");
+			idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "chat", description);
+			SetDataAndScreenPop(message, idContactSelected, idActivity);
+		}
+	}
+}
+
+/**
+ * Email Scenario/Workflow implementation
+ */
+function EmailContactPopUpEmailAddress(message) {
+	log.info("EmailContactPopUpEmailAddress");
+	var myEmail = message.attachdata.EmailAddress;
+	if (!myEmail)
+		myEmail = message.EmailAddress;
+
+	var idContactSelected = SearchContactByField('email', myEmail);
+
+	var description = "Email {0}  : Subject: {1}".format(message.InteractionID, message.attachdata.Subject);
+	var idActivity = null;
+
+	if (iwscore.snConfig.screenpopnew) {
+		idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "email", description, message);
+		SetDataAndScreenPop(message, idContactSelected, idActivity);
+	} else {
+		if (idContactSelected) {
+			var refEnt = CountOpenEntitiesByContact(idContactSelected);
+			switch (refEnt.count) {
+				case 0:
+					//create incident
+					idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "email", description, message);
+					break;
+				case 1:
+					idActivity = refEnt.entityId;
+					break;
+				default:
+					switch (iwscore.snConfig.defaultEntity) {
+						case "incident":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateIN 1,2^caller_id=' + idContactSelected
+							});
+							break;
+						case "sn_customerservice_case":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateIN 1,2^contact=' + idContactSelected
+							});
+							break;
+						case "interaction":
+							openFrameAPI.openServiceNowList({
+								entity: iwscore.snConfig.defaultEntity,
+								query: 'stateINnew,work_in_progress^opened_for=' + idContactSelected
+							});
+							break;
+					}
+			}
+			if (idActivity) {
+				log.debugFormat("[EmailContactPopUpEmailAddress] screenpop on Entity {0}", idActivity);
+				SetDataAndScreenPop(message, idContactSelected, idActivity);
+			} else {
+				//multiple Activities
+				log.debug("Contact found, ScreenPop on activity list");
+			}
+		} else {
+			log.debug("No Contact found, create Activity and ScreenPop");
+			idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "email", description, message);
+			SetDataAndScreenPop(message, idContactSelected, idActivity);
+		}
+	}
+	//idActivity = CreateDefaultEntity(message.InteractionID, idContactSelected, "email", description, message);
+	//SetDataAndScreenPop(message, idContactSelected, idActivity);
+}
+
+/**
+ * Search a Contact by a specific field
+ */
+function SearchContactByField(field_name, field_value) {
+	var contactID;
+	var gr = new GlideRecord(iwscore.snConfig.defaultContact); //'customer_contact' 
+	gr.addQuery(field_name, field_value);
+	log.debugFormat("Try to execute the query: {0}={1}", field_name, field_value);
+	gr.query();
+	var countContact = 0;
+	while (gr.next()) {
+		log.debugFormat("[SearchContactByPhone] Found Contact {0} on {1}={2}", gr.sys_id, field_name, field_value);
+		contactID = gr.sys_id;
+		countContact++;
+	}
+
+	if (countContact != 1)
+		contactID = null;
+
+	log.debugFormat("[SearchContactByPhone] {0} count: {1}", iwscore.snConfig.defaultContact, countContact);
+	return contactID;
+}
+
+function SearchContactByPhone(field_value) {
+	var contactID;
+	var countContact = 0;
+	log.debugFormat("[SearchContactByPhone] on Number {0}", field_value);
+	//var qry = "phone=123456^ORhome_phone=123456^ORmobile_phone=123456";
+	var qry = "phone={0}^ORhome_phone={0}^ORmobile_phone={0}".format(field_value);
+	var gr = new GlideRecord(iwscore.snConfig.defaultContact);
+	gr.encodedQuery = qry;
+	log.info("encoded Query:" + gr.getEncodedQuery());
+	gr.query();
+
+	while (gr.next()) {
+		log.debugFormat("[SearchContactByPhone] Found {0} {1} on {2}", iwscore.snConfig.defaultContact, gr.sys_id, field_value);
+		contactID = gr.sys_id;
+		countContact++;
+	}
+
+	if (countContact != 1)
+		contactID = null;
+
+	log.debugFormat("[SearchContactByPhone] {0} count: {1}", iwscore.snConfig.defaultContact, countContact);
+	return contactID;
+}
+
+/**
+ * Screen-pop on a Record by ID
+ */
+function OpenRecord(table, id) {
+	log.infoFormat("[OpenRecord] table [{0}] id [{1}]", table, id);
+	//parent.frames['gsft_main'].g_navigation.openRecord(table, id);
+	var sysid = 'sys_id=' + id;
+	openFrameAPI.openServiceNowForm({
+		entity: table,
+		query: sysid
+	});
+}
+
+/**
+ * 
+ */
+function CreateIncident(interactionId, contactId, contact_type, description) {
+	var id;
+	var gr = new GlideRecord('incident');
+	gr.setValue("short_description", description);
+	gr.setValue("x_sofin_cti_connec_interaction_id", interactionId);
+	gr.setValue("contact_type", contact_type); //"phone"
+	if (contactId)
+		gr.setValue("caller_id", contactId);
+	gr.setValue("active", true);
+	//gr.setValue("state", ""); //default = 1
+	gr.setValue("assigned_to", g_user.userID);
+	id = gr.insert();
+	log.infoFormat("CreateIncident Id [{0}]", id);
+	return id;
+}
+
+/**
+ * Allow to change the Incident State to Close
+ */
+function CloseIncident(incidentid) {
+	if (!incidentid) {
+		log.error("CloseIncident: incidentid is null!");
+		return;
+	}
+
+	log.infoFormat("CloseIncident incidentid [{0}]", incidentid);
+	var current = new GlideRecord('incident');
+	current.get(incidentid);
+	current.state = '7';
+	current.update();
+}
+
+function CreateCase(interactionId, contactId, contact_type, description, priority) {
+	log.info("CreateCase init...");
+	//log.infoFormat("CreateCase incidentid [{0}]", incidentid);
+	var id;
+	var gr = new GlideRecord('sn_customerservice_case');
+	gr.setValue("short_description", description);
+
+	gr.setValue("contact_type", contact_type); //"phone"
+	if (contactId)
+		gr.setValue("contact", contactId);
+
+	if (priority && priority > 0)
+		gr.setValue("priority", priority); // 1=Critical, 2=High, 3=Moderate, 4=Low (Default)
+
+	gr.setValue("x_sofin_cti_connec_interaction_id", interactionId);
+
+	gr.setValue("active", true);
+	gr.setValue("assigned_to", g_user.userID);
+	var gr1 = new GlideRecord("sys_user");
+gr1.addQuery("sys_id", gr.assigned_to);
+gr1.query();
+if (gr1.next()) {
+   gr.setValue("assignment_group",gr1.u_default_group);
+}
+	id = gr.insert();
+	log.info("CreateCase Id [{0}]", id);
+	return id;
+}
+
+function CreateInteraction(interactionId, contactId, contact_type, description, message) {
+	var id;
+	var gr = new GlideRecord('interaction');
+	if (description)
+		gr.setValue("short_description", description);
+
+	gr.setValue("x_sofin_cti_connec_interaction_id", interactionId);
+	gr.setValue("type", contact_type); //"phone" or chat
+	if (contactId)
+		gr.setValue("opened_for", contactId);
+	gr.setValue("active", true);
+	gr.setValue("state", "work_in_progress"); //"new", "work_in_progress" etc...
+	gr.setValue("assigned_to", g_user.userID);
+	var gr1 = new GlideRecord("sys_user");
+gr1.addQuery("sys_id", gr.assigned_to);
+gr1.query();
+if (gr1.next()) {
+   gr.setValue("assignment_group",gr1.u_default_group);
+}
+	//get wait_time
+	var sWaitTime = "";
+	try{
+		var diffSec = EY_GetSecondsFromStringDate(message.ConnectedTime) - EY_GetSecondsFromStringDate(message.SourceMsg.eventBody.participants[0].connectedTime);
+		sWaitTime = EY_AddSecondsToUniversalTime(diffSec);
+		log.infoFormat("CreateInteraction wait_time [{0}]", sWaitTime);
+		gr.setValue("wait_time", sWaitTime);
+		
+	}catch(e)
+	{
+		log.error("CreateInteraction wait_time " + e.message);
+	}
+	
+	id = gr.insert();
+
+	//Patch to avoid issue in insert the wait_time on creation time
+	try{
+		var grUpdate = new GlideRecord('interaction');
+		grUpdate.get(id);
+		grUpdate.wait_time = sWaitTime;
+		grUpdate.update();
+	}catch(e)
+	{
+		log.error("CreateInteraction update wait_time " + e.message);
+	}
+
+	log.infoFormat("CreateInteraction Id [{0}]", id);
+	return id;
+}
+
+function GetLastCaseByContact(contactID) {
+	var caseID;
+
+	var gr = new GlideRecord('sn_customerservice_case');
+	gr.addQuery("contact", contactID);
+	gr.orderByDesc('opened_at');
+	gr.query();
+	while (gr.next()) {
+		log.debugFormat("[GetLastCaseByContact] Found Case {0} opened_at {1}", gr.sys_id, gr.opened_at);
+		caseID = gr.sys_id;
+		break;
+	}
+
+	if (caseID) {
+		log.debugFormat("[GetLastCaseByContact] Found Case {0} for Contact {1}", caseID, contactID);
+	} else {
+		log.debugFormat("[GetLastCaseByContact] Case not Found for Contact {0}", contactID);
+	}
+	return caseID;
+}
+
+function CountOpenEntitiesByContact(contactid) {
+	var countEntities = {
+		count: 0,
+		entityId: ''
+	};
+	log.infoFormat("CountOpenEntitiesByContact search entities on contact [{0}]", contactid);
+	var gr = new GlideRecord(iwscore.snConfig.defaultEntity);
+
+	switch (iwscore.snConfig.defaultEntity) {
+		case "incident":
+			gr.addQuery('state', 'IN', "1,2");
+			gr.addQuery('caller_id', '=', contactid);
+			log.info("CountOpenEntitiesByContact search entities with state IN [1,2]");
+			break;
+		case "sn_customerservice_case":
+			gr.addQuery('state', 'IN', "1,2");
+			gr.addQuery('contact', '=', contactid);
+			log.info("CountOpenEntitiesByContact search entities with state IN [1,2]");
+			break;
+		case "interaction":
+			gr.addQuery('state', 'IN', "new,work_in_progress");
+			gr.addQuery('opened_for', '=', contactid);
+			log.info("CountOpenEntitiesByContact search entities with state IN [new,work_in_progress]");
+			break;
+	}
+	gr.query();
+
+	while (gr.next()) {
+		log.debugFormat("[CountOpenEntitiesByContact] Found Entity {0}", gr.sys_id);
+		countEntities.count++;
+		countEntities.entityId = gr.sys_id;
+	}
+	log.debugFormat("[CountOpenEntitiesByContact] Entity count: {0}", countEntities.count);
+
+	return countEntities;
+}
+
+function SearchEntityByField(table_name, field_name, field_value) {
+	var id;
+	var gr = new GlideRecord(table_name);
+	gr.addQuery(field_name, field_value);
+	log.debugFormat("Try to execute the query on {0}: {1}={2}", table_name, field_name, field_value);
+	gr.query();
+	var count = 0;
+	while (gr.next()) {
+		log.debugFormat("[SearchEntityByField] Found {1} on {2}={3}", table_name, gr.sys_id, field_name, field_value);
+		id = gr.sys_id;
+		count++;
+	}
+
+	if (count != 1)
+		id = null;
+
+	log.debugFormat("[SearchEntityByField] Incident count: {0}", count);
+	return id;
+}
+
+/**
+ * Example
+ * var surl = '<a href="' + document.location.origin + '/%table_name%.do?sys_id=' + id + ' target="_blank">content</a>';
+ * log.debugFormat("Url [{0}] built", surl);
+ * work_notes = '[code]' + surl +  work_notes + '[/code]';
+ * UpdateWorkNotesOnEntity
+ * @param {*} tableName 
+ * @param {*} id 
+ * @param {*} work_notes 
+ */
+function UpdateWorkNotesOnEntity(tableName, id, work_notes) {
+	try {
+		var gr = new GlideRecord(tableName);
+		gr.get(id);
+		gr.work_notes = work_notes;
+		gr.update();
+	} catch (e) {
+		log.error("UpdateWorkNotesOnEntity " + e.message);
+	}
+}
+
+//===========================================================================
+// Participant Utilities
+//===========================================================================
+
+/**
+ * get partecipant for current Genesys user
+ * usefull on Outbound scenario
+ * @param {*} message 
+ */
+function GetParticipantMe(message) {
+	var pMe;
+	try {
+		var myId = pClient.user.id;
+		log.debug("GetParticipantMe search  me");
+		for (var i = 0; i < message.SourceMsg.eventBody.participants.length; i++) {
+			var element = message.SourceMsg.eventBody.participants[i];
+			log.debugFormat("participant:{0}", element.purpose);
+			if (element.userId == myId) {
+				log.debugFormat("Found participant me: {0}", element.id);
+				pMe = element;
+				break;
+			}
+		}
+	} catch (e) {
+		log.error("GetParticipantMe " + e.message);
+	}
+	log.infoFormat("GetParticipantMe return [{0}]", pMe);
+	return pMe;
+}
+
+/**
+ * get partecipant id for current Genesys user
+ * usefull on Outbound scenario
+ * @param {*} message 
+ */
+function GetParticipantMeId(message) {
+	log.debug("FJ_GetParticipantMeId get my id");
+	var id;
+	var pMe = GetParticipantMe(message);
+	if (pMe)
+		id = pMe.id;
+
+	log.infoFormat("GetParticipantMeId return [{0}]", id);
+	return id;
+}
+
+
+function GetCustomerParticipantId(message) {
+	log.debug("GetCustomerParticipantId get my id");
+	var id;
+	var pCustomer = GetCustomerParticipant(message);
+	if (pCustomer)
+		id = pCustomer.id;
+
+	log.infoFormat("GetCustomerParticipantId return [{0}]", id);
+	return id;
+}
+
+function GetCustomerParticipant(message) {
+	var customer;
+	try {
+		log.debug("GetCustomerParticipant ...");
+		for (var i = 0; i < message.SourceMsg.eventBody.participants.length; i++) {
+			var element = message.SourceMsg.eventBody.participants[i];
+			log.debugFormat("participant:{0}", element.purpose);
+			if ((element.purpose == "external") || (element.purpose == "customer")) {
+				log.debugFormat("Found customer:{0}", element.id);
+				customer = element;
+				break;
+			}
+		}
+	} catch (e) {
+		log.error("GetCustomerParticipant " + e.message);
+	}
+	log.infoFormat("GetCustomerParticipant return customer [{0}]", customer);
+	return customer;
+}
+//===========================================================================
+
+function IsTransferConsult(message) {
+	//message.SourceMsg.eventBody.participants.length > 2
+	var count = 0;
+	try {
+		log.debug("FJ_IsTransferConsult ...");
+		for (var i = 0; i < message.SourceMsg.eventBody.participants.length; i++) {
+			var element = message.SourceMsg.eventBody.participants[i];
+			log.debugFormat("participant:{0}", element.purpose);
+			if ((element.purpose == "user") || (element.purpose == "agent")) {
+				count++;
+			}
+		}
+	} catch (e) {
+		log.error("IsTransferConsult " + e.message);
+	}
+	log.debugFormat("IsTransferConsult Count [{0}]", count);
+	var bRet = (count > 1);
+	log.debugFormat("IsTransferConsult return [{0}]", bRet);
+
+	return bRet;
+}
+
+function isIncidentDefaultEntity() {
+	return iwscore.snConfig.defaultEntity == "incident";
+}
+
+/**
+ * Open the OpenFrame area if closed
+ * it is useful when an Interaction come up, to show the CTI gadget
+ */
+function ShowCtiToolbar() {
+	openFrameAPI.show();
+}
+
+/**
+* Hide the OpenFrame area if open
+* it is useful when you want the whole CRM area available
+ 
+*/
+function HideCtiToolbar() {
+	openFrameAPI.hide();
+}
+
+/**
+ * Check if is currently visible TAB
+ */
+function isConnectorNotActiveVisible() {
+	return parent.top.document.hidden;
+}
+
+function formatUsPhone(phone) {
+	return phone.replace("+1", "").replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+}
+
+function GetAttributeFromAgentWorkspaceContext() {
+	var attributes = {};
+	var path = parent.location.pathname;
+	log.infoFormat("GetAttributeFromAgentWorkspaceContext pathname [{0}]", path);
+	path = path.replace("/now/workspace/agent", "");
+	var arr = path.split("/record/");
+	arr.forEach(function (entry) {
+		log.debugFormat("GetAttributeFromAgentWorkspaceContext entry [{0}]", entry);
+		if (entry) {
+			var myel = entry.split("/");
+			if (myel && myel.length == 2) {
+				log.debugFormat("GetAttributeFromAgentWorkspaceContext element {0}", myel[0]);
+				switch (myel[0]) {
+					case "incident":
+					case "iteraction":
+					case "case":
+						attributes["ACTIVITY_TABLE"] = myel[0];
+						attributes["ACTIVITY_ID"] = myel[1];
+						break;
+					case "sys_user":
+					case "customer_contact":
+						attributes["CONTACT_TABLE"] = myel[0];
+						attributes["CONTACT_ID"] = myel[1];
+						break;
+				}
+			}
+		}
+	});
+	log.infoFormat("GetAttributeFromAgentWorkspaceContext [{0}]", attributes);
+	return attributes;
+}
+
+function executePayLoadConnector(context) {
+	try {
+		log.infoFormat("executePayLoadConnector {0}", context);
+		if (context.action) {
+			log.infoFormat("executePayLoadConnector action {0}", context.action);
+			switch (context.action) {
+				case "makecall":
+					ShowCtiToolbar();
+					var call = {
+						number: context.number,
+						type: "call",
+						autoPlace: true,
+						attributes: context.attributes
+					};
+					iwscommand.clickToDialPEF(call);
+					break;
+				case "setattachdata":
+					break;
+				default:
+					log.warn("[executePayLoadConnector] action not defined!");
+			}
+
+		} else {
+			//"Agent Workspace" support
+			log.infoFormat("executePayLoadConnector type {0}", context.type);
+			switch (context.type) {
+				case "OUTGOING_CALL":
+					ShowCtiToolbar();
+					//context.data.metaData.phoneNumber
+					//collect all info from current context
+					var context_attributes = GetAttributeFromAgentWorkspaceContext();
+					var call1 = {
+						number: context.data.metaData.phoneNumber,
+						type: "call",
+						autoPlace: true,
+						attributes: context_attributes
+					};
+					iwscommand.clickToDialPEF(call1);
+					break;
+			}
+		}
+	} catch (e) {
+		log.error("executePayLoadConnector" + e);
+	}
+
+}
+
+//============================================================
+// AWA Sync
+//============================================================
+function syncAwaStatus(message) {
+	if (iwscore.snConfig.awaSync) {
+		var genesysState;
+		//message.user.presence.presenceDefinition.id
+		if (message.user) {
+			log.infoFormat("ChannelStatus Genesys from Activate [{0}]", message.user.presence.presenceDefinition.systemPresence);
+			genesysState = message.user.presence.presenceDefinition.systemPresence.toUpperCase();
+		} else {
+			log.infoFormat("ChannelStatus Genesys from ChannelStaus [{0}]", message.attachdata.presence_status);
+			genesysState = message.attachdata.presence_status;
+		}
+
+		log.infoFormat("ChannelStatus Genesys [{0}]", genesysState);
+		if (!genesysState) {
+			return;
+		}
+		//message.user.presence.presenceDefinition.systemPresence
+		var snState = iwscore.snConfig.awaMapping[genesysState];
+		log.infoFormat("ChannelStatus Servicenow [{0}]", snState);
+		if (snState) {
+			//call Servicenow awa service
+			var mypresence = new GlideAjax("x_sofin_cti_connec.GenesysAwa");
+			mypresence.addParam("sysparm_name", "setPresence");
+			mypresence.addParam("sysparm_presencename", snState);
+			mypresence.getXML(awaGetResponse);
+		}
+	}
+}
+
+function awaGetResponse(response) {
+	var answer = response.responseXML.documentElement.getAttribute("answer");
+	log.info("awaGetResponse: " + answer);
+}
+
+async function syncGenesysStatus(message) {
+	try {
+		//context.result.presence.name
+		var gcState = iwscore.snConfig.gcMapping[message.result.presence.name];
+		log.infoFormat("ChannelStatus Genesys [{0}]", gcState);
+		if (gcState) {
+			//call Genesys service presence
+			var presence = await pClient.presenceApi.getUserPresence(pClient.getMe().id, 'PURECLOUD');
+			log.infoFormat("ChannelStatus Genesys presence [{0}]", JSON.stringify(presence));
+			if (presence.presenceDefinition.id != gcState) {
+				//call api
+				var ret = await pClient.presenceApi.patchUserPresence(pClient.getMe().id, 'PURECLOUD', {
+					presenceDefinition: {
+						id: gcState
+					}
+				});
+				log.infoFormat("ChannelStatus Genesys Updated [{0}]", JSON.stringify(ret));
+			}
+		}
+	} catch (e) {
+		log.error("syncGenesysStatus " + e.message);
+	}
+
+}]]></script>
+        <script_name>iwsutilPEF</script_name>
+        <sys_class_name>sys_ui_script</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2019-03-21 12:00:37</sys_created_on>
+        <sys_id>afbf0106db5c3740483e78fdaa961984</sys_id>
+        <sys_mod_count>94</sys_mod_count>
+        <sys_name>x_sofin_cti_connec.iwsutilPEF</sys_name>
+        <sys_package display_value="CTI-Connector-ServiceNow" source="x_sofin_cti_connec">a33a94f7dbe42b00f7a71fe96896199c</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="CTI-Connector-ServiceNow">a33a94f7dbe42b00f7a71fe96896199c</sys_scope>
+        <sys_update_name>sys_ui_script_afbf0106db5c3740483e78fdaa961984</sys_update_name>
+        <sys_updated_by>IN010110099</sys_updated_by>
+        <sys_updated_on>2021-09-27 13:51:39</sys_updated_on>
+        <ui_type>0</ui_type>
+        <use_scoped_format>false</use_scoped_format>
+    </sys_ui_script>
+</record_update>

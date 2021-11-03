@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ui_page">
+    <sys_ui_page action="INSERT_OR_UPDATE">
+        <category>general</category>
+        <client_script><![CDATA[function handleCommunicationEvent(context) {
+	log.infoFormat("Communication from Topframe: {0}", context);
+	try {
+		executePayLoadConnector(context);
+	} catch (error) {
+		log.error(error);
+	}
+}
+
+function handleAwaEvent(context) {
+	try {
+		log.info("handleAwaEvent: " + JSON.stringify(context));
+		if (context && context.result && context.result.presence) {
+			log.infoFormat("handleAwaEvent Name [{0}] Available [{1}]", context.result.presence.name, context.result.presence.available);
+			if (iwscore.snConfig && iwscore.snConfig.gcSync) {
+				syncGenesysStatus(context);
+			}
+
+		}
+	} catch (e) {
+		log.error("handleAwaEvent " + e.message);
+	}
+	//context.result.presence
+	//context.result.presence.channels
+	//context.result.presence.available
+	//context.result.presence.name
+	//context.result.presence.sys_id
+}
+
+function initSuccess(snConfig) {
+	log.infoFormat("openframe configuration: {0}", snConfig);
+	if (snConfig) {
+		//call init	
+		log.infoFormat("openframe configuration: {0}", snConfig.configuration);
+		if (snConfig.configuration) {
+			try {
+				var configConnector = JSON.parse(snConfig.configuration);
+				log.infoFormat("openframe configConnector: {0}", configConnector);
+				initSNConnectorConfiguration(configConnector);
+			} catch (error) {
+				//default init
+				log.error("Error in init OpenFrame", error);
+			}
+		} else {
+			initSNConnectorConfiguration({});
+		}
+	}
+	//register for communication event from TopFrame
+	openFrameAPI.subscribe(openFrameAPI.EVENTS.COMMUNICATION_EVENT, handleCommunicationEvent);
+
+	if (openFrameAPI.EVENTS.OPENFRAME_AWA_AGENT_PRESENCE)
+		openFrameAPI.subscribe(openFrameAPI.EVENTS.OPENFRAME_AWA_AGENT_PRESENCE, handleAwaEvent);
+}
+
+function initFailure(error) {
+	log.error("OpenFrame init failed..");
+	log.error(error);
+}
+
+var config = {};
+openFrameAPI.init(config, initSuccess, initFailure);]]></client_script>
+        <description>Load Pure Embeddable</description>
+        <direct>false</direct>
+        <endpoint>x_sofin_cti_connec_PURE-Connector-Page.do</endpoint>
+        <html><![CDATA[<?xml version="1.0" encoding="utf-8" ?>
+<j:jelly trim="false" xmlns:j="jelly:core" xmlns:g="glide" xmlns:j2="null" xmlns:g2="null">
+	<script src="x_sofin_cti_connec.pureClientSdkBundleFu.jsdbx"></script>
+	<script src="x_sofin_cti_connec.softphone-connector-c.jsdbx"></script>
+	<script src="scripts/openframe/latest/openFrameAPI.min.js"></script>
+	<script src="x_sofin_cti_connec.iwsprescriptPEF.jsdbx"></script>	
+	<script src="x_sofin_cti_connec.iwsscriptPEF.jsdbx"></script>
+	<script src="x_sofin_cti_connec.iwsutilPEF.jsdbx"></script>	
+	<script src="x_sofin_cti_connec.iwsconfig-pure.jsdbx"></script>
+	<iframe allow="microphone; camera" style="border:0px;margin:0px;" id="pureFrame" width="100%" height="100%"></iframe>
+</j:jelly>]]></html>
+        <name>PURE-Connector-Page</name>
+        <processing_script/>
+        <sys_class_name>sys_ui_page</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2018-09-26 09:32:21</sys_created_on>
+        <sys_id>c7165e55db3cab00483e78fdaa96194f</sys_id>
+        <sys_mod_count>40</sys_mod_count>
+        <sys_name>PURE-Connector-Page</sys_name>
+        <sys_package display_value="CTI-Connector-ServiceNow" source="x_sofin_cti_connec">a33a94f7dbe42b00f7a71fe96896199c</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="CTI-Connector-ServiceNow">a33a94f7dbe42b00f7a71fe96896199c</sys_scope>
+        <sys_update_name>sys_ui_page_c7165e55db3cab00483e78fdaa96194f</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2021-02-01 16:42:14</sys_updated_on>
+    </sys_ui_page>
+</record_update>

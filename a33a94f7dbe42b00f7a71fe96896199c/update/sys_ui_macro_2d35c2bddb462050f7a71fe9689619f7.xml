@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ui_macro">
+    <sys_ui_macro action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <category>general</category>
+        <description/>
+        <media_type/>
+        <name>show_phone</name>
+        <scoped_name>x_sofin_cti_connec_show_phone</scoped_name>
+        <sys_class_name>sys_ui_macro</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2021-02-01 09:48:50</sys_created_on>
+        <sys_id>2d35c2bddb462050f7a71fe9689619f7</sys_id>
+        <sys_mod_count>5</sys_mod_count>
+        <sys_name>show_phone</sys_name>
+        <sys_package display_value="CTI-Connector-ServiceNow" source="x_sofin_cti_connec">a33a94f7dbe42b00f7a71fe96896199c</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="CTI-Connector-ServiceNow">a33a94f7dbe42b00f7a71fe96896199c</sys_scope>
+        <sys_update_name>sys_ui_macro_2d35c2bddb462050f7a71fe9689619f7</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2021-02-01 11:08:36</sys_updated_on>
+        <xml><![CDATA[<?xml version="1.0" encoding="utf-8" ?>
+<j:jelly trim="false" xmlns:j="jelly:core" xmlns:g="glide" xmlns:j2="null" xmlns:g2="null">
+<j:set var="jvar_n" value="${ref}" />
+<g:inline template="ie_checker.xml" />
+<!-- show phone icon for sys_user ref field -->
+<g2:evaluate var="jvar_obj" object="true" jelly="true">
+	var tableName = current.getTableName();
+	var elementName = "${ref}";
+	if (elementName.startsWith(tableName))
+		elementName = elementName.substring(tableName.length + 1);
+	var element = current.getElement(elementName);
+	var obj = {};
+	obj['disp_val'] = element.getDisplayValue();
+	obj['sys_meta'] = elementName;
+	obj['task_id'] = current.sys_id;
+	obj['task_value'] = current.getDisplayValue();
+	obj['task_label'] = current.getLabel();
+	var show_phone = false;
+	if (!gs.isMobile()) {
+		if (gs.hasRole('sn_openframe_user')) {
+			var ed = element.getED();
+			if (!gs.nil(ed)) {
+				var ref_gr = element.getRefRecord();
+				if (!gs.nil(ref_gr)) {
+					var base_table = new GlideTableHierarchy(ref_gr.getRecordClassName()).getRoot();
+					var gr = new GlideRecord(base_table);
+					var ge;
+					var field;
+					var phone_fields = '';
+					var phone_labels = '';
+					gr.initialize();
+					var list = gr.getElements();
+					for (var i = 0; i != list.length; i++) {
+						ge = list[i];
+						field = ge.getED().getInternalType();
+						if (field == 'ph_number') {
+							show_phone = true;
+							phone_fields += ge.getName() + ',';
+							phone_labels += ge.getLabel() + ',';
+						}
+					}
+				}
+			}
+		}
+		if (jelly.jvar_isMSIE == 'true') {
+			if (jelly.jvar_MSIE_vn ${AMP}lt; 10 ) {
+				show_phone = false;
+			}
+		} 
+	}
+	obj['show_phone'] = show_phone;
+	obj;
+</g2:evaluate>
+<j2:if test="$[jvar_obj.show_phone == 'true']">
+	<a id="phone_${jvar_n}" data-show-phone="true"
+	    data-phone-fields="$[phone_fields]"
+	    data-phone-labels="$[phone_labels]"
+		data-phonenos-count=""
+	    data-ref-sys_id="$[element.sys_id]"
+	   
+		data-caller-id="$[element.sys_id]"
+		data-caller-table="$[jvar_target_form]"
+		data-caller-value="$[jvar_obj.disp_val]"
+		data-caller-label="$[element.getLabel()]"
+		data-caller-name="$[jvar_obj.disp_val]"
+		data-caller-phone=""
+	   
+		data-task-id="$[jvar_obj.task_id]"
+		data-task-table="$[ref]"
+		data-task-value="$[jvar_obj.task_value]"
+		data-task-label="$[jvar_obj.task_label]"
+		data-task-view="$[sysparm_view]"
+	   
+		data-company-id=""
+		data-company-table=""
+		data-company-label=""
+		data-company-value=""
+	    
+	    style="display:none;">
+		<span id="${jvar_n}"
+			onclick="dummyPhoneClick(this, '${jvar_n}')"
+			name="${jvar_n}"
+			style="display: inlne-block;"
+			aria-label="${HTML:gs.getMessage('Call')}"
+			title="${gs.getMessage('Call')}"
+			alt="${gs.getMessage('Call')}"
+			class="icon ref-button icon-phone btn btn-default btn-ref"></span>
+	</a>
+	
+	<script>
+		function dummyPhoneClick(element, reference) {
+			var $refButton = $j(gel("phone_"+element.id));
+			var table = $refButton.attr("data-caller-table");
+			var fields = $refButton.attr("data-phone-fields");
+			var labels =  $refButton.attr("data-phone-labels");
+			var sys_id = $refButton.attr("data-ref-sys_id");
+			var phoneCount = parseInt($refButton.attr("data-phonenos-count"));
+		
+			if(phoneCount > 1) {
+				var gdw = new GlideModal('x_sofin_cti_connec_phone_number_selector_cti');
+				gdw.setTitle(getMessage('Select Phone Number'));
+				gdw.setSize(200);
+				gdw.setPreference('phone_fields', fields);
+				gdw.setPreference('phone_labels', labels);
+				gdw.setPreference('phone_table', table);
+				gdw.setPreference('ref_sys_id', sys_id);
+				gdw.render();
+			} else
+				processPhoneClick(element);
+		}
+		
+		
+		function showPhoneIcon(element, original, changed, loading) {
+			var $refButton = $j(gel("phone_"+element.id));
+			var table = $refButton.attr("data-caller-table");
+			var fields = $refButton.attr("data-phone-fields").split(',');
+			var phoneCount = 0;
+		
+			var sys_id = $refButton.attr("data-ref-sys_id");
+			if (!changed || changed.length == 0) {
+				$refButton.hide();
+				return;
+			}
+			
+			CustomEvent.observe('cti_phone_number_selected_'+sys_id, function(value) {
+				var o = new GlideModal().get('x_sofin_cti_connec_phone_number_selector_cti');
+				o.destroy();
+				$refButton.attr("data-caller-phone", value);
+				processPhoneClick(element);
+			});
+			debugger;
+			//get phone number and show phone icon if caller has phone number
+			var ga = new GlideAjax('sn_openframe.OpenFrameAjaxUtility');
+			ga.addParam('sysparm_name', 'getGlideRecordData');
+			
+			var input =[{"sysparm_table_name": table,
+						"sysparm_sys_id": changed}];
+		    
+			if(table == "sys_user")
+				input[0]["sysparm_fields"] =  $refButton.attr("data-phone-fields");
+		    else
+				input[0]["sysparm_fields"] = $refButton.attr("data-phone-fields")+"account";
+		
+			ga.addParam('input',JSON.stringify(input));
+			ga.getXML(function(serverResponse) {
+				var result = serverResponse.responseXML.getElementsByTagName("result");
+				var output = JSON.parse(result[0].getAttribute("items"));
+		
+				if(output)
+				for(var j = 0; j ${AMP}lt; output.length; j++) {
+					var tableName = output[j].tableName;
+					var items = output[j].items;
+					
+					if(tableName == $refButton.attr("data-caller-table")){
+						for(var i = 0; i ${AMP}lt; items.length; i++) {
+							var field = items[i].field;
+							if ($j.inArray( field, fields ) != -1) {
+								if (items[i].value != "") {
+									$refButton.show().children().show();
+									$refButton.attr("data-caller-phone", items[i].value);
+									phoneCount++;
+								}
+							} else if (field == "account") {
+								$refButton.attr("data-company-table", items[i].entity);
+								$refButton.attr("data-company-value", items[i].value);
+								$refButton.attr("data-company-id", items[i].sys_id);
+								$refButton.attr("data-company-label", items[i].label);
+							}
+						}
+					}
+				}
+				$refButton.attr("data-phonenos-count", phoneCount);
+			});
+			
+		}
+		
+		
+		function processPhoneClick(element) {
+			try {
+				var p = $j(gel("phone_"+element.id));
+				if (p.length > 0) {
+					var task =    {"entity": p.attr('data-task-table'), "query" :"sys_id="+p.attr('data-task-id')+"$[AMP]sysparm_view="+p.attr('data-task-view'),"value":p.attr('data-task-value'),"label":p.attr('data-task-label')};
+					var company = {"entity": p.attr('data-company-table'),"query":"sys_id="+p.attr('data-company-id')+"$[AMP]sysparm_view="+p.attr('data-task-view'),"value":p.attr('data-company-value'),"label":p.attr('data-company-label')};
+					var caller = {"entity": p.attr('data-caller-table'),"query": "sys_id="+p.attr('data-caller-id')+"$[AMP]sysparm_view="+p.attr('data-task-view'),"value":p.attr('data-caller-value'),"label":p.attr('data-caller-label')};
+					
+					var callContext = [];
+					callContext.push(task);
+					callContext.push(company);
+					callContext.push(caller);
+		
+					var metaData = {"phoneNumber":p.attr('data-caller-phone'),"taskId":p.attr('data-task-id')};
+					
+					var data =    {"metaData":metaData , "data": callContext};
+					var payload = {"type": "OUTGOING_CALL", "data" : data,"action":"makecall","number":p.attr('data-caller-phone'), "attributes": {"ACTIVITY_ID": p.attr('data-task-id'), "ENTITY_TYPE": p.attr('data-task-id'), "CONTACT_ID":p.attr('data-caller-id')}};
+
+		var context = {"payload": payload, "method" : "openframe_communication"};
+		CustomEvent.fireAll("openframe_request", context);
+
+					/*
+		var payload = {"type": "OUTGOING_CALL", "data" : data};
+					var createInteractionData ={};
+					createInteractionData.interactionSysId = -1;
+					createInteractionData.direction = 'outbound';
+					createInteractionData.context_document = p.attr('data-task-id');
+					createInteractionData.context_table = p.attr('data-task-table');
+					createInteractionData.account = p.attr('data-company-id');
+					createInteractionData.contact = p.attr('data-caller-id');
+					createInteractionData.opened_for = p.attr('data-caller-id');
+					var ga = new GlideAjax('global.CTIAjaxUtility');
+					ga.addParam('sysparm_name', 'createInteractionWithPropertyCheck');
+					ga.addParam('context', JSON.stringify(createInteractionData));
+					ga.getXML(function(serverResponse) {
+						var result = serverResponse.responseXML.getElementsByTagName("result");
+						var output = JSON.parse(result[0].getAttribute("data"));
+						if(output.status == "success"){
+							var interaction = {"entity": "interaction", "query" :"sys_id="+output.fields.interactionSysId, "value":output.fields.number, "label":"Interaction", "display":false};
+							payload.data.data.push(interaction);
+						}
+						var context = {"payload": payload, "method" : "openframe_communication" };
+						jslog("context with interaction : "+ JSON.stringify(context));
+						CustomEvent.fireAll("openframe_request", context);
+					});
+			*/
+				}
+			} catch (e) {
+				jslog("error at processPhoneClick : "+ e);
+			}
+		}
+		var n = '${ref}'.replace(/\./g, '_');
+		var h = new GlideEventHandler('onChange_' + n, showPhoneIcon, '${ref}');
+		g_event_handlers.push(h);
+	</script>
+</j2:if>
+</j:jelly>]]></xml>
+    </sys_ui_macro>
+</record_update>
