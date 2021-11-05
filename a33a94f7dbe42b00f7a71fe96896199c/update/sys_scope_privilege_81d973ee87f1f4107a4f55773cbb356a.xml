@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_scope_privilege">
+    <sys_scope_privilege action="INSERT_OR_UPDATE">
+        <operation>execute</operation>
+        <source_scope display_value="CTI-Connector-ServiceNow">a33a94f7dbe42b00f7a71fe96896199c</source_scope>
+        <status>allowed</status>
+        <sys_class_name>sys_scope_privilege</sys_class_name>
+        <sys_created_by>IN010110099</sys_created_by>
+        <sys_created_on>2021-08-09 11:58:07</sys_created_on>
+        <sys_id>81d973ee87f1f4107a4f55773cbb356a</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>MSTeamsChatUtil</sys_name>
+        <sys_package display_value="CTI-Connector-ServiceNow" source="x_sofin_cti_connec">a33a94f7dbe42b00f7a71fe96896199c</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="CTI-Connector-ServiceNow">a33a94f7dbe42b00f7a71fe96896199c</sys_scope>
+        <sys_update_name>sys_scope_privilege_81d973ee87f1f4107a4f55773cbb356a</sys_update_name>
+        <sys_updated_by>IN010110099</sys_updated_by>
+        <sys_updated_on>2021-08-09 11:58:07</sys_updated_on>
+        <target_name>MSTeamsChatUtil</target_name>
+        <target_scope display_value="">adbeaa4a53742300ba5d0ef5d5dc34c2</target_scope>
+        <target_type>sys_script_include</target_type>
+    </sys_scope_privilege>
+</record_update>

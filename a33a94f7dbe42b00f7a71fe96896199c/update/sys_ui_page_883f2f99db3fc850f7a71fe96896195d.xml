@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ui_page">
+    <sys_ui_page action="INSERT_OR_UPDATE">
+        <category>general</category>
+        <client_script><![CDATA[function loadPhoneNumbers(phoneNos, recSysId) {
+	var labels = $j('.phone_number_selector .labels');
+	var values = $j('.phone_number_selector .values');
+	var nos = phoneNos.split('^');
+	var value;
+	var data= [];
+	for(var i=0; i < nos.length; i++) {
+		value = nos[i].split(':');
+		if(value[1] && (value[1] != "null"))
+		{
+			var e = '<div style="padding-bottom:10px;"><span style="padding-right:10px; width:50%;">'+value[0]+':</span></div>';
+			var v = '<div style="padding-bottom:10px;"><a style="color: #278efc;width:50%" onclick="numberClicked(this)" id="'+recSysId+'">'+value[1]+'</a></div>';
+		
+			labels.append(e);
+			values.append(v);		
+		}
+		
+	}
+}
+
+function numberClicked(element) {
+	CustomEvent.fireTop('cti_phone_number_selected_'+element.id, element.text);
+}]]></client_script>
+        <description/>
+        <direct>false</direct>
+        <endpoint>x_sofin_cti_connec_phone_number_selector_cti.do</endpoint>
+        <html><![CDATA[<?xml version="1.0" encoding="utf-8" ?>
+<j:jelly trim="false" xmlns:j="jelly:core" xmlns:g="glide" xmlns:j2="null" xmlns:g2="null">
+<g:requires name="scripts/heisenberg/heisenberg_all.js"/>
+<g:evaluate var="jvar_phone_table"
+    expression="RP.getWindowProperties().phone_table" />
+<g:evaluate var="jvar_phone_fields"
+    expression="RP.getWindowProperties().phone_fields" />
+<g:evaluate var="jvar_ref_sys_id"
+    expression="RP.getWindowProperties().ref_sys_id" />
+<g:evaluate var="jvar_phone_labels"
+    expression="RP.getWindowProperties().phone_labels" />
+	<g:evaluate var="jvar_phone_numbers" object="true" jelly="true">
+		  var answer = new Array();
+		  var value;
+		  var gr = new GlideRecord('${jvar_phone_table}');
+		  gr.get('${jvar_ref_sys_id}');
+		  gr.query();
+		  if (gr.next()) {
+		  var fields = '${jvar_phone_fields}'.split(',');
+		  var labels = '${jvar_phone_labels}'.split(',');
+			  for(var i=0; i != fields.length; i++) {
+				  value = GlideStringUtil.escapeHTML(gr.getValue(fields[i]));
+		          if(value != null)
+					  answer.push(GlideStringUtil.escapeHTML(labels[i])+':'+value);
+			  }
+		  }
+		  answer.join('^');
+	</g:evaluate>
+<div class="phone_number_selector">
+	<div class="labels" style="width:40%;float:left"></div>
+	<div class="values"></div>
+</div>
+	<script>
+		addLoadEvent(function () {
+			loadPhoneNumbers('${jvar_phone_numbers}', '${jvar_ref_sys_id}');
+		});
+	</script>
+</j:jelly>]]></html>
+        <name>phone_number_selector_cti</name>
+        <processing_script/>
+        <sys_class_name>sys_ui_page</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2020-03-26 11:32:11</sys_created_on>
+        <sys_id>883f2f99db3fc850f7a71fe96896195d</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>phone_number_selector_cti</sys_name>
+        <sys_package display_value="CTI-Connector-ServiceNow" source="x_sofin_cti_connec">a33a94f7dbe42b00f7a71fe96896199c</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="CTI-Connector-ServiceNow">a33a94f7dbe42b00f7a71fe96896199c</sys_scope>
+        <sys_update_name>sys_ui_page_883f2f99db3fc850f7a71fe96896195d</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2020-03-26 11:32:11</sys_updated_on>
+    </sys_ui_page>
+</record_update>
